@@ -58,8 +58,8 @@ The agent follows a strict 5-step protocol for every user request:
 |:---|:---|:---|
 | **0. Intent** | Extract & Classify | Classify user complaint as GENERIC (vague) or SPECIFIC (targeted) |
 | **1. Web Check** | `checkWebDatabase` | Always the first tool call — get current web state and reason array |
-| **2. Upstream** | `checkInventory` / `checkPricing` / `checkPimService` | Only query systems flagged by reason array or user intent |
-| **3. Remediate** | `triggerAutoSync` | Separate sync call per discrepancy found (inventory, price, or pim) |
+| **2. Upstream** | `checkInventory` / `checkPricing` / `checkDeadLetterQueue` / `queryGuide` | Query flagged systems. If discrepancy confirmed, check DLQ for locks. If locked, query the RAG Guide. |
+| **3. Remediate** | `triggerAutoSync` / `delegateToL2Detective` | Trigger the specific sync. If the sync fails twice, hand off to L2 Detective Agent for root cause analysis. |
 | **4. Verify** | `verifyWebState` | Closed-loop confirmation the fix worked |
 | **5. Summarize** | Agent response | Reports findings, actions taken, and final verified state |
 
