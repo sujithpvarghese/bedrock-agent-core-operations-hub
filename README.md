@@ -19,26 +19,33 @@ An enterprise-grade **Autonomous Operations Hub** built on the **Amazon Bedrock 
 
 ```mermaid
 graph TD
-    User([Support Team]) -->|Natural Language| Agent[Strands Agent SDK]
+    User([Support Team]) -->|Natural Language| Agent[OpsHub Agent]
     Agent -->|Step 0: Classify Intent| Intent{GENERIC or SPECIFIC?}
 
     Intent -->|GENERIC: not online etc| Web[checkWebDatabase]
-    Intent -->|SPECIFIC: price wrong etc| Web
+    Intent -->|SPECIFIC: targeted issue| Web
 
-    Web -->|reason array| Triage{Triage by reason / intent}
+    Web -->|reason array| Triage{Triage upstream systems}
 
-    Triage -->|inventory flagged| INV[checkInventory]
-    Triage -->|price flagged| PRICE[checkPricing]
-    Triage -->|metadata flagged| PIM[checkPimService]
-    Triage -->|error code found| GUIDE[queryGuide]
+    Triage --> INV[checkInventory]
+    Triage --> PRICE[checkPricing]
+    Triage --> PIM[checkPimService]
+    Triage --> DLQ[checkDeadLetterQueue]
 
-    INV --> Sync[triggerAutoSync per system]
+    INV --> Sync[triggerAutoSync]
     PRICE --> Sync
     PIM --> Sync
+    DLQ --> GUIDE[queryGuide]
     GUIDE --> Sync
 
-    Sync --> Verify[verifyWebState]
-    Verify -->|SELLABLE confirmed| User
+    Sync -->|Sync Success| Verify[verifyWebState]
+    Sync -->|Sync Fails| A2A(((L2 Detective Agent)))
+    
+    A2A -.->|Tool| CloudTrail[checkCloudTrailLogs]
+    A2A -.->|Tool| Jira[checkJiraCommits]
+    A2A -->|Root Cause Findings| Verify
+    
+    Verify -->|Final status & summary| User
 ```
 
 ---
