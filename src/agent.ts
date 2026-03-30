@@ -5,9 +5,14 @@ import { Agent, BedrockModel, FunctionTool } from '@strands-agents/sdk';
  * Official Strands SDK Implementation v1.0.0-rc.1
  */
 
+const logger = {
+  info: (event: string, context: any) => console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: 'INFO', event, ...context })),
+  error: (event: string, error: any, context?: any) => console.error(JSON.stringify({ timestamp: new Date().toISOString(), level: 'ERROR', event, error: error.message || error, ...context }))
+};
+
 // 1. Define Model
 const model = new BedrockModel({
-  modelId: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+  modelId: "anthropic.claude-3-5-sonnet-20241022-v2:0",
   region: process.env.AWS_REGION || "us-east-1"
 });
 
@@ -26,7 +31,7 @@ const checkWebTool = new FunctionTool({
     required: ["productId"]
   },
   callback: async (input: any) => {
-    console.log(JSON.stringify({ event: "TOOL_CALL", tool: "checkWebDatabase", target: input.productId }));
+    logger.info("TOOL_CALL", { tool: "checkWebDatabase", target: input.productId });
     
     if (!IS_MOCK) {
       // return await webSystemApi.getProductStatus(input.productId);
@@ -54,7 +59,7 @@ const inventoryTool = new FunctionTool({
     required: ["skuId"]
   },
   callback: async (input: any) => {
-    console.log(JSON.stringify({ event: "TOOL_CALL", tool: "checkInventory", skuId: input.skuId }));
+    logger.info("TOOL_CALL", { tool: "checkInventory", skuId: input.skuId });
     if (!IS_MOCK) {
       // return await inventoryService.getStock(input.skuId);
     }
@@ -73,7 +78,7 @@ const pricingTool = new FunctionTool({
     required: ["skuId"]
   },
   callback: async (input: any) => {
-    console.log(JSON.stringify({ event: "TOOL_CALL", tool: "checkPricing", skuId: input.skuId }));
+    logger.info("TOOL_CALL", { tool: "checkPricing", skuId: input.skuId });
     if (!IS_MOCK) {
       // return await pricingEngine.getPrice(input.skuId);
     }
@@ -92,7 +97,7 @@ const troubleshootingTool = new FunctionTool({
     required: ["errorCode"]
   },
   callback: async (input: any) => {
-    console.log(JSON.stringify({ event: "TOOL_CALL", tool: "queryGuide", errorCode: input.errorCode }));
+    logger.info("TOOL_CALL", { tool: "queryGuide", errorCode: input.errorCode });
     
     if (!IS_MOCK) {
       // ACTUAL RAG IMPLEMENTATION: 
@@ -131,7 +136,7 @@ const syncTool = new FunctionTool({
   },
   callback: async (input: any) => {
     const target = input.productId || input.skuId || '';
-    console.log(JSON.stringify({ event: "TOOL_CALL", tool: "triggerAutoSync", system: input.syncType, target }));
+    logger.info("TOOL_CALL", { tool: "triggerAutoSync", system: input.syncType, target });
 
     if (!IS_MOCK) {
        // return await triggerEventBridgeSync(input.syncType, target);
@@ -150,7 +155,7 @@ const syncTool = new FunctionTool({
       };
     }
     
-    console.log(JSON.stringify({ event: "TOOL_SUCCESS", tool: "triggerAutoSync", target }));
+    logger.info("TOOL_SUCCESS", { tool: "triggerAutoSync", target });
     return {
       status: "SYNC_TRIGGERED",
       system: input.syncType as string,
@@ -173,7 +178,7 @@ const pimTool = new FunctionTool({
     required: ["styleId"]
   },
   callback: async (input: any) => {
-    console.log(JSON.stringify({ event: "TOOL_CALL", tool: "checkPimService", styleId: input.styleId }));
+    logger.info("TOOL_CALL", { tool: "checkPimService", styleId: input.styleId });
     if (!IS_MOCK) {
       // return await pimApi.getProductMetadata(input.styleId);
     }
@@ -199,7 +204,7 @@ const dlqTool = new FunctionTool({
     required: ["productId"]
   },
   callback: async (input: any) => {
-    console.log(JSON.stringify({ event: "TOOL_CALL", tool: "checkDeadLetterQueue", productId: input.productId }));
+    logger.info("TOOL_CALL", { tool: "checkDeadLetterQueue", productId: input.productId });
     if (!IS_MOCK) {
       // return await sqsClient.send(new ReceiveMessageCommand({ QueueUrl: process.env.DLQ_URL, ... }));
     }
@@ -236,7 +241,7 @@ const verifyTool = new FunctionTool({
     required: ["productId"]
   },
   callback: async (input: any) => {
-    console.log(JSON.stringify({ event: "TOOL_CALL", tool: "verifyWebState", productId: input.productId }));
+    logger.info("TOOL_CALL", { tool: "verifyWebState", productId: input.productId });
     if (!IS_MOCK) {
       // return await webSystemApi.getProductStatus(input.productId);
     }
@@ -288,7 +293,7 @@ const delegateToL2Detective = new FunctionTool({
     required: ["errorCode"]
   },
   callback: async (input: any) => {
-    console.log(JSON.stringify({ event: "A2A_HANDOFF", to: "L2Detective", reason: input.errorCode }));
+    logger.info("A2A_HANDOFF", { to: "L2Detective", reason: input.errorCode });
     // 💥 A2A MAGIC: Pause the main agent, spin up the sub-agent with its own prompt/tools!
     const investigation = await l2DetectiveAgent.invoke(`Find root cause for error: ${input.errorCode} on ${input.targetProduct || 'system'}`);
     return { l2Verdict: investigation.toString() };
@@ -355,7 +360,20 @@ export const agent = {
 };
 
 export const handler = async (event: any) => {
-  const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
-  const result = await agent.run({ userPrompt: body.textMessage });
-  return { statusCode: 200, body: JSON.stringify(result) };
+  try {
+    const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+    
+    if (!body || !body.textMessage) {
+      return { statusCode: 400, body: JSON.stringify({ error: "Missing textMessage in request body." }) };
+    }
+
+    const result = await agent.run({ userPrompt: body.textMessage });
+    return { statusCode: 200, body: JSON.stringify(result) };
+  } catch (error: any) {
+    logger.error("EXECUTION_FAILURE", error);
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Internal Agent Error", message: error.message || "Unknown error occurred" }) 
+    };
+  }
 };

@@ -119,14 +119,14 @@ npm run deploy
 ```bash
 npm run eval
 ```
-*Runs 5 scenarios covering generic triage, specific complaints, episodic memory, PIM metadata, and full reconciliation.*
+*Runs 6 scenarios covering generic triage, specific complaints, episodic memory, PIM metadata, DLQ recovery, and full reconciliation.*
 
 ---
 
 ## 📂 Project Structure
 *   `src/agent.ts`: Core orchestrator — 9 tools, A2A Sub-Agent, intent-aware system prompt, Strands SDK agent.
 *   `src/evaluator.ts`: Evaluation runner — scores agent accuracy against ground truth scenarios.
-*   `config/eval.json`: 5 evaluation scenarios covering all reasoning paths.
+*   `config/eval.json`: 6 evaluation scenarios covering all reasoning paths.
 *   `serverless.yml`: Infrastructure-as-code for Lambda and AgentCore deployment.
 
 ---

@@ -60,13 +60,11 @@ Respond ONLY with valid JSON in this exact format — no other text:
   const rawText = responseBody.content[0].text.trim();
 
   try {
-    const rawText = responseBody.content[0].text.trim();
     // Claude often wraps JSON in markdown blocks (e.g. ```json ... ```)
     const cleanedText = rawText.replace(/```json\n?|\n?```/g, '').trim();
     return JSON.parse(cleanedText);
   } catch (err: any) {
     // Fallback if judge response is completely malformed or unparseable
-    const rawText = JSON.parse(new TextDecoder().decode(response.body))?.content?.[0]?.text?.trim() || "No response";
     return { score: 0, reasoning: `Judge response could not be parsed: ${rawText}` };
   }
 }
