@@ -1,0 +1,47 @@
+{
+  "test_suite": "Operations Hub - Full Reconciliation Diagnostics v2",
+  "scenarios": [
+    {
+      "name": "Generic Availability Complaint (Inventory + Price Both Down)",
+      "description": "GENERIC intent — agent must use checkWebDatabase + reason array to triage. Both systems need fixing.",
+      "input": "Why is prod000 not showing on the site? It should have been live since this morning.",
+      "expected_tools": ["checkWebDatabase", "checkInventory", "checkPricing", "triggerAutoSync", "verifyWebState"],
+      "ground_truth": "Product prod000 was NOT_SELLABLE due to webInventory=0 and webPrice=$0. Upstream inventory confirmed 150 units and price $24.99. Triggered separate syncs for inventory and pricing. Product is now SELLABLE."
+    },
+    {
+      "name": "Specific Price Complaint on SELLABLE Product",
+      "description": "SPECIFIC intent — user says price is wrong. Product IS online but price is stale. Agent must NOT exit early on SELLABLE.",
+      "input": "I think the price is wrong for prod666. It looks off compared to what we set.",
+      "expected_tools": ["checkWebDatabase", "checkPricing", "triggerAutoSync", "verifyWebState"],
+      "ground_truth": "Product prod666 is SELLABLE but a price discrepancy was found. Upstream price differs from web price. Triggered a price sync. Web price has been updated and verified."
+    },
+    {
+      "name": "Episodic Memory Fast-Path (SKU 1029)",
+      "description": "Agent recalls SKU 1029 was recently fixed — should skip diagnosis and go straight to sync then verify.",
+      "input": "Can you check on SKU 1029 again please.",
+      "expected_tools": ["triggerAutoSync", "verifyWebState"],
+      "ground_truth": "Episodic memory indicates SKU 1029 was recently fixed. Triggered inventory sync immediately and confirmed the product is SELLABLE."
+    },
+    {
+      "name": "PIM Metadata Complaint (Wrong Product Name)",
+      "description": "SPECIFIC intent — user flags a metadata issue. Agent must call checkPimService and sync pim.",
+      "input": "The product name for prod_9982 looks completely wrong on the site. Can you fix it?",
+      "expected_tools": ["checkWebDatabase", "checkPimService", "triggerAutoSync", "verifyWebState"],
+      "ground_truth": "A PIM metadata discrepancy was found for prod_9982. The upstream product name differs from what is displayed on the web. Triggered a PIM sync and verified the product metadata is now correct."
+    },
+    {
+      "name": "Full Reconciliation — All Systems Down",
+      "description": "GENERIC intent — checkWebDatabase returns reason array with inventory, price, and metadata issues. Agent must call all upstream systems and fix all.",
+      "input": "Product prod_9982 is completely broken on the site — not visible at all.",
+      "expected_tools": ["checkWebDatabase", "checkInventory", "checkPricing", "checkPimService", "triggerAutoSync", "verifyWebState"],
+      "ground_truth": "Product prod_9982 was NOT_SELLABLE due to inventory, price, and metadata issues. All three upstream systems were queried and discrepancies confirmed. Separate syncs triggered for inventory, price, and PIM. Product is now SELLABLE."
+    },
+    {
+      "name": "DLQ Recovery — Sync Failure + Guide Consultation",
+      "description": "Tests the error handling path. A previous sync crashed (DLQ entry exists). Agent must find it, consult the guide, and then sync successfully.",
+      "input": "Why is prod_dlq not showing on the site? We pushed it yesterday.",
+      "expected_tools": ["checkWebDatabase", "checkInventory", "checkDeadLetterQueue", "queryGuide", "triggerAutoSync", "verifyWebState"],
+      "ground_truth": "Product prod_dlq was NOT_SELLABLE due to a previous failed sync job found in the Dead Letter Queue with a ConsumerDatabaseTimeoutException. The troubleshooting guide confirmed this is a transient DB lock issue. An autonomous sync was triggered and the product is now SELLABLE."
+    }
+  ]
+}

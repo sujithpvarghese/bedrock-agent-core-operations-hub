@@ -1,0 +1,88 @@
+service: bedrock-agent-core-ops
+frameworkVersion: "4"
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  stage: dev
+  memorySize: 512
+  timeout: 60
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+            - bedrock:InvokeAgent
+            - bedrock:GetAgent
+            - bedrock:ListAgents
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - bedrock-agent-runtime:InvokeAgent
+            - bedrock-agent-runtime:RetrieveAndGenerate
+          Resource: "*"
+
+plugins:
+  - serverless-esbuild
+
+functions:
+  agentOrchestrator:
+    handler: src/agent.handler
+    description: The main orchestrator using Strands SDK for Bedrock AgentCore.
+    events:
+      - http:
+          path: chat
+          method: post
+
+resources:
+  Resources:
+    # Bedrock AgentCore Managed Runtime
+    # This allows for Episodic Memory and unified Observations trace.
+    AgentCoreRuntime:
+      Type: AWS::Bedrock::AgentCoreRuntime
+      Properties:
+        RuntimeName: OperationsHubRuntime
+        Description: "Enterprise-grade Operations Hub using Episodic Memory"
+        MemoryConfiguration:
+          EpisodeTtl: 86400 # 24-hours of episodic "short-term" memory
+          LongTermMemoryEnabled: true
+        PolicyConfiguration:
+          Source: "Only allow sync triggers for out-of-stock items detected in the past 12 hours."
+
+    # Bedrock Guardrail to prevent Prompt Injection and PII leakage
+    OperationsHubGuardrail:
+      Type: AWS::Bedrock::Guardrail
+      Properties:
+        Name: OpsHubSafetyGuardrail
+        Description: "Prevents prompt injection and blocks AWS Account IDs or sensitive PII."
+        BlockedInputMessaging: "SECURITY ALERT: Your request was blocked by AWS Bedrock Guardrails."
+        BlockedOutputsMessaging: "SECURITY ALERT: The agent response was blocked by AWS Bedrock Guardrails due to policy violation."
+        ContentPolicyConfig:
+          FiltersConfig:
+            - Type: PROMPT_ATTACK
+              InputStrength: HIGH
+            - Type: HATE
+              InputStrength: HIGH
+              OutputStrength: HIGH
+        SensitiveInformationPolicyConfig:
+          PiiEntitiesConfig:
+            - Type: AWS_SECRET_KEY
+              Action: BLOCK
+            - Type: EMAIL
+              Action: ANONYMIZE
+
+    OperationsHubGuardrailVersion:
+      Type: AWS::Bedrock::GuardrailVersion
+      Properties:
+        GuardrailArn: !Ref OperationsHubGuardrail
+        Description: "v1 active guardrail"
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: true
+    target: node22
+    platform: node

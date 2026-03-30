@@ -1,0 +1,25 @@
+{
+  "name": "bedrock-agent-core-operations-hub",
+  "version": "1.0.0",
+  "description": "Next-generation Bedrock AgentCore Operations Hub using Strands SDK and Episodic Memory.",
+  "author": "Palamkunnel Sujith <sujithpvarghese@gmail.com>",
+  "main": "dist/agent.js",
+  "scripts": {
+    "build": "tsc",
+    "deploy": "sls deploy",
+    "eval": "tsx src/evaluator.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.1018.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1018.0",
+    "@strands-agents/sdk": "^1.0.0-rc.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.25.0",
+    "serverless": "^3.38.0",
+    "serverless-esbuild": "^1.52.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.0.0"
+  }
+}
